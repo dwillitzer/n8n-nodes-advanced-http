@@ -1,0 +1,15 @@
+nodes/**/*.ts
+!nodes/**/*.d.ts
+tests/
+src/
+.eslintrc.js
+.gitignore
+.npmignore
+jest.config.js
+tsconfig.json
+coverage/
+*.log
+.DS_Store
+.env
+.vscode/
+.idea/
