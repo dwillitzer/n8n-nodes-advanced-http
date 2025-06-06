@@ -1,17 +1,18 @@
 import {
+  ApplicationError,
   IExecuteFunctions,
   INodeExecutionData,
   INodeType,
   INodeTypeDescription,
-  NodeOperationError,
   NodeConnectionType,
+  NodeOperationError,
 } from 'n8n-workflow';
 
 export class AdvancedHttp implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Advanced HTTP Request',
     name: 'advancedHttp',
-    icon: 'fa:globe',
+    icon: 'file:AdvancedHttp.node.icon.svg',
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["method"]}} {{$parameter["url"]}}',
@@ -23,11 +24,11 @@ export class AdvancedHttp implements INodeType {
     outputs: ['main' as NodeConnectionType],
     credentials: [
       {
-        name: 'httpBasicAuth',
+        name: 'httpBasicAuthApi',
         required: false,
       },
       {
-        name: 'httpHeaderAuth',
+        name: 'httpHeaderAuthApi',
         required: false,
       },
     ],
@@ -37,13 +38,13 @@ export class AdvancedHttp implements INodeType {
         name: 'method',
         type: 'options',
         options: [
-          { name: 'GET', value: 'GET' },
-          { name: 'POST', value: 'POST' },
-          { name: 'PUT', value: 'PUT' },
-          { name: 'PATCH', value: 'PATCH' },
           { name: 'DELETE', value: 'DELETE' },
+          { name: 'GET', value: 'GET' },
           { name: 'HEAD', value: 'HEAD' },
           { name: 'OPTIONS', value: 'OPTIONS' },
+          { name: 'PATCH', value: 'PATCH' },
+          { name: 'POST', value: 'POST' },
+          { name: 'PUT', value: 'PUT' },
         ],
         default: 'GET',
         description: 'The request method to use',
@@ -119,20 +120,6 @@ export class AdvancedHttp implements INodeType {
         default: {},
         options: [
           {
-            displayName: 'Timeout',
-            name: 'timeout',
-            type: 'number',
-            default: 30000,
-            description: 'Timeout in milliseconds',
-          },
-          {
-            displayName: 'Validate SSL Certificate',
-            name: 'validateSSL',
-            type: 'boolean',
-            default: true,
-            description: 'Whether to validate SSL certificates',
-          },
-          {
             displayName: 'Follow Redirects',
             name: 'followRedirect',
             type: 'boolean',
@@ -152,6 +139,20 @@ export class AdvancedHttp implements INodeType {
             type: 'boolean',
             default: false,
             description: 'Whether to return the full response including headers and status',
+          },
+          {
+            displayName: 'Timeout',
+            name: 'timeout',
+            type: 'number',
+            default: 30000,
+            description: 'Timeout in milliseconds',
+          },
+          {
+            displayName: 'Validate SSL Certificate',
+            name: 'validateSSL',
+            type: 'boolean',
+            default: true,
+            description: 'Whether to validate SSL certificates',
           },
         ],
       },
@@ -228,11 +229,23 @@ export class AdvancedHttp implements INodeType {
           }
         }
 
+        // In n8n, logging is handled by the platform
+        // Authentication headers are automatically handled by n8n's credential system
+
         // Make the request
         const response = await this.helpers.httpRequest(requestOptions);
 
+        // Prepare response data
+        const responseData = options.fullResponse ? {
+          statusCode: response.statusCode,
+          headers: maskSensitiveHeaders(response.headers || {}),
+          body: response.body || response,
+          url: requestOptions.url,
+          method: requestOptions.method,
+        } : { data: response };
+
         returnData.push({
-          json: options.fullResponse ? response : { data: response },
+          json: responseData,
           pairedItem: i,
         });
 
@@ -256,13 +269,70 @@ export class AdvancedHttp implements INodeType {
 }
 
 // Helper functions
-function isValidUrl(url: string): boolean {
-    try {
-      const parsed = new URL(url);
-      return ['http:', 'https:'].includes(parsed.protocol);
-    } catch {
-      return false;
+
+// List of sensitive header names to mask
+const SENSITIVE_HEADERS = [
+  'authorization',
+  'x-api-key',
+  'x-auth-token',
+  'x-access-token',
+  'api-key',
+  'apikey',
+  'token',
+  'bearer',
+  'cookie',
+  'set-cookie',
+  'x-csrf-token',
+  'x-xsrf-token',
+];
+
+// Mask sensitive headers in objects
+function maskSensitiveHeaders(headers: Record<string, any>): Record<string, any> {
+  const masked: Record<string, any> = {};
+  
+  for (const [key, value] of Object.entries(headers)) {
+    const lowerKey = key.toLowerCase();
+    const isSensitive = SENSITIVE_HEADERS.some(h => lowerKey.includes(h));
+    
+    if (isSensitive) {
+      // Keep first and last 3 characters visible for debugging
+      const strValue = String(value);
+      if (strValue.length > 10) {
+        masked[key] = `${strValue.substring(0, 3)}...${strValue.substring(strValue.length - 3)}`;
+      } else {
+        masked[key] = '[REDACTED]';
+      }
+    } else {
+      masked[key] = value;
     }
+  }
+  
+  return masked;
+}
+
+// Sanitize request options for logging
+function sanitizeRequestForLogging(options: any): any {
+  const sanitized = { ...options };
+  
+  if (sanitized.headers) {
+    sanitized.headers = maskSensitiveHeaders(sanitized.headers);
+  }
+  
+  // Also mask sensitive data in body if it contains credentials
+  if (sanitized.json && typeof sanitized.json === 'object') {
+    const bodyStr = JSON.stringify(sanitized.json);
+    if (bodyStr.includes('password') || bodyStr.includes('secret') || bodyStr.includes('token')) {
+      sanitized.json = '[BODY CONTAINS SENSITIVE DATA - REDACTED]';
+    }
+  }
+  
+  return sanitized;
+}
+
+function isValidUrl(url: string): boolean {
+  // Basic URL validation without using URL constructor
+  const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+  return urlPattern.test(url);
 }
 
 function mergeHeaders(queryHeaders?: any, apiHeaders?: any): any {
@@ -281,11 +351,11 @@ function convertValue(fieldData: any): any {
         return String(value);
       case 'integer':
         const intVal = parseInt(value, 10);
-        if (isNaN(intVal)) throw new Error(`Invalid integer value: ${value}`);
+        if (isNaN(intVal)) throw new ApplicationError(`Invalid integer value: ${value}`);
         return intVal;
       case 'number':
         const numVal = parseFloat(value);
-        if (isNaN(numVal)) throw new Error(`Invalid number value: ${value}`);
+        if (isNaN(numVal)) throw new ApplicationError(`Invalid number value: ${value}`);
         return numVal;
       case 'boolean':
         return typeof value === 'boolean' ? value : 
@@ -295,17 +365,17 @@ function convertValue(fieldData: any): any {
           return typeof value === 'string' ? JSON.parse(value) : 
                  (Array.isArray(value) ? value : []);
         } catch (e) {
-          throw new Error(`Invalid array value: ${value}`);
+          throw new ApplicationError(`Invalid array value: ${value}`);
         }
       case 'object':
         try {
           return typeof value === 'string' ? JSON.parse(value) : 
                  (typeof value === 'object' ? value : {});
         } catch (e) {
-          throw new Error(`Invalid object value: ${value}`);
+          throw new ApplicationError(`Invalid object value: ${value}`);
         }
       default:
-        throw new Error(`Unknown type: ${type}`);
+        throw new ApplicationError(`Unknown type: ${type}`);
     }
 }
 
@@ -325,7 +395,7 @@ function convertObject(obj: any): any {
           converted[key] = value;
         }
       } catch (error: any) {
-        throw new Error(`Error converting field "${key}": ${error.message}`);
+        throw new ApplicationError(`Error converting field "${key}": ${error.message}`);
       }
     }
     return converted;

@@ -3,31 +3,29 @@
   "version": "0.1.0",
   "description": "Advanced HTTP Request node for n8n with dynamic type conversion and enhanced security",
   "keywords": [
-    "n8n-community-node-package",
-    "n8n",
-    "http",
-    "request",
-    "api",
-    "type-conversion"
+    "n8n-community-node-package"
   ],
+  "license": "MIT",
+  "homepage": "https://github.com/dwillitzer/n8n-nodes-advanced-http",
   "author": {
     "name": "dwillitzer",
     "email": "dwillitzer@gmail.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dwillitzer/n8n-nodes-advanced-http.git"
+    "url": "https://github.com/dwillitzer/n8n-nodes-advanced-http.git"
+  },
+  "engines": {
+    "node": ">=20.15"
   },
   "main": "index.js",
   "scripts": {
-    "build": "tsc && cp package.json dist/ && cp README.md dist/ && cp LICENSE dist/",
+    "build": "rimraf dist && tsc && gulp build:icons",
     "dev": "tsc --watch",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "lint": "eslint nodes credentials --ext .ts",
-    "lint:fix": "eslint nodes credentials --ext .ts --fix",
-    "prepublishOnly": "npm run build && npm run test"
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes",
+    "lintfix": "eslint nodes --fix",
+    "prepublishOnly": "npm run build && npm run lint -c .eslintrc.prepublish.js nodes"
   },
   "files": [
     "dist"
@@ -40,19 +38,16 @@
     ]
   },
   "devDependencies": {
-    "@types/jest": "^29.5.5",
-    "@types/node": "^20.8.0",
-    "@typescript-eslint/eslint-plugin": "^6.7.4",
-    "@typescript-eslint/parser": "^6.7.4",
-    "eslint": "^8.51.0",
-    "jest": "^29.7.0",
-    "n8n-core": "^1.9.0",
+    "@typescript-eslint/parser": "~8.32.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.3",
+    "gulp": "^5.0.0",
     "n8n-workflow": "^1.9.0",
-    "ts-jest": "^29.1.1",
-    "typescript": "^5.2.2"
+    "prettier": "^3.5.3",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.8.2"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
-  },
-  "license": "MIT"
+  }
 }

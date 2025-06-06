@@ -117,13 +117,34 @@ The node supports the following type conversions:
 }
 ```
 
-## Security Best Practices
+## Security Features
 
-1. **Always validate URLs** - The node automatically validates URLs to prevent SSRF attacks
-2. **Use HTTPS** - The node validates SSL certificates by default
-3. **Manage credentials securely** - Use n8n's credential system
-4. **Set appropriate timeouts** - Prevent hanging requests
-5. **Handle errors gracefully** - Use continue-on-fail when appropriate
+### Authentication Header Protection
+
+This node includes built-in security features to protect sensitive authentication data:
+
+1. **Automatic Header Masking**: When returning full responses, sensitive headers are automatically masked:
+   - `Authorization`, `X-API-Key`, `Token`, etc. are partially redacted
+   - Shows only first and last 3 characters for debugging (e.g., `Bea...xyz`)
+   - Completely redacts short tokens as `[REDACTED]`
+
+2. **Credential Integration**: The node integrates with n8n's credential system:
+   - Supports `httpBasicAuth` and `httpHeaderAuth` credentials
+   - Credentials are never exposed in logs or outputs
+   - n8n handles credential encryption and storage
+
+3. **No Logging of Sensitive Data**: Unlike curl commands, this node:
+   - Never logs full authentication headers
+   - Doesn't expose credentials in error messages
+   - Keeps sensitive data within n8n's secure credential system
+
+### Additional Security Best Practices
+
+1. **URL Validation** - Automatically validates URLs to prevent SSRF attacks
+2. **SSL/TLS Verification** - Validates SSL certificates by default
+3. **Timeout Protection** - Default 30-second timeout prevents hanging requests
+4. **Error Handling** - Errors never expose full request details with credentials
+5. **Type Safety** - Strong type validation prevents injection attacks
 
 ## Development
 
@@ -141,19 +162,13 @@ npm run build
 npm run lint
 ```
 
-## Testing
+## Why Use This Over Curl?
 
-The node includes comprehensive unit tests covering:
-- Type conversion logic
-- URL validation
-- Error handling
-- Dynamic data processing
-- HTTP request configuration
-
-Run tests with coverage:
-```bash
-npm run test:coverage
-```
+1. **Security**: Authentication headers are protected and never exposed
+2. **Integration**: Native n8n node with proper error handling
+3. **Type Safety**: Automatic type conversion with validation
+4. **No Shell Risk**: No command injection vulnerabilities
+5. **Better Performance**: Direct HTTP calls without shell overhead
 
 ## License
 
